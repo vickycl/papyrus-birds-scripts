@@ -1,4 +1,4 @@
-setwd("D:/MyStuff/Masters2/Research Project/R Project")
+setwd("D:/MyStuff/Masters2/ResearchProject/R Project")
 
 library(tidyverse)
 library(sf)
@@ -8,12 +8,12 @@ library(terra)
 #### Workflow to produce classification rasters ####
 prepare_geom <- function(sf){
   # Dissolve polygons, project to UTM36N for buffering, negatively buffer
-  new_geom <- st_union(sf) %>% 
-    st_make_valid() %>% 
-    st_transform(crs = 32735) %>% 
-    st_buffer(-5) %>% 
-    st_make_valid() %>% 
-    st_cast("POLYGON")
+  new_geom <- st_transform(sf, crs = 32735) %>% 
+              st_union() %>% 
+              st_make_valid() %>%
+              st_buffer(-5) %>% 
+              st_make_valid() %>% 
+              st_cast("POLYGON")
   
   new_sf <- st_sf(geometry = new_geom)
   # Calculate areas
@@ -59,17 +59,17 @@ train_papyrus$class <- 2
 train_broad$class <- 3
 
 # Add in other classifications from manual polygons
-train_agri <- st_read("../PapyrusData/Custom Data Layers/Agriculture.shp") %>% 
+train_agri <- st_read("../PapyrusData/CustomDataLayers/Agriculture.shp") %>% 
   subset(select = c('geometry'))
-train_forest <- st_read("../PapyrusData/Custom Data Layers/Forest_Scrub.shp")%>% 
+train_forest <- st_read("../PapyrusData/CustomDataLayers/Forest_Scrub.shp")%>% 
   subset(select = c('geometry'))
-train_cloud <- st_read("../PapyrusData/Custom Data Layers/Clouds.shp")%>% 
+train_cloud <- st_read("../PapyrusData/CustomDataLayers/Clouds.shp")%>% 
   subset(select = c('geometry'))
-train_water <- st_read("../PapyrusData/Custom Data Layers/OpenWater.shp")%>% 
+train_water <- st_read("../PapyrusData/CustomDataLayers/OpenWater.shp")%>% 
   subset(select = c('geometry'))
-train_urban <- st_read("../PapyrusData/Custom Data Layers/Urban.shp")%>% 
+train_urban <- st_read("../PapyrusData/CustomDataLayers/Urban.shp")%>% 
   subset(select = c('geometry'))
-train_shadow <- st_read("../PapyrusData/Custom Data Layers/Cloud Shadow.shp")%>% 
+train_shadow <- st_read("../PapyrusData/CustomDataLayers/Cloud Shadow.shp")%>% 
   subset(select = c('geometry'))
 
 train_agri$class <- 4
@@ -82,7 +82,7 @@ train_shadow$class <- 9
 # Step 3 - merge all shapes into 1 dataset
 
 # TODO: Confirm this is the right sentinel to base the raster on given the cell size, CRS etc
-sentinel <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_AOT_20m.jp2")
+sentinel <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_B01_20m.jp2")
 # TODO: We need to knit a further west raster on to capture Lake Mutanda
 dataset <- rbind(train_agriwet, 
                  train_papyrus, 
@@ -137,12 +137,15 @@ writeRaster(
 # NOW READ BACK IN TO CLEAN UP OUTPUT
 
 # For comparison
-multispec_out <- rast("../PapyrusData/Multispec Output/T35MRU_20250804T080631_B_output1.tif")
-plot(multispec_out)
-
-multispec_result <- rast("../PapyrusData/Multispec Output/ClassifiedOutput_1.tif")
+multispec_result <- rast("../PapyrusData/MultispecOutput/Multispec_output_20260609.tif")
 plot(multispec_result)
 crs(multispec_result) <- crs(sentinel)
+
+writeRaster(
+  multispec_result,
+  "../PapyrusData/Merged_VRC/Classified_Output_20260609.tif",
+  overwrite = TRUE
+)
 
 # Turn the resulting classified raster back into polygons 
 classified_geom <- as.polygons(multispec_result, dissolve = T)
@@ -152,6 +155,26 @@ classified_geom_sf <- st_as_sf(classified_geom)
 classified_geom_sf$area_m2 <- st_area(classified_geom_sf)
 
 min_area <- units::set_units(2000, "m^2")
-classified_geom_sf <- subset(classified_geom_sf, ClassifiedOutput_1 %in% c(1,2,3) || area_m2 > min_area)
+classified_geom_sf_sub <- subset(classified_geom_sf, ClassifiedOutput_1 %in% c(1,2,3) | area_m2 > min_area)
 
-st_write(classified_geom_sf, dsn = "../Output/Classified_Vector_Sieved.shp", append = F)
+
+papyrus_geoms <- subset(classified_geom_sf, ClassifiedOutput_1 == 2)
+broad_geoms <- subset(classified_geom_sf, ClassifiedOutput_1 == 3)
+
+sum(papyrus_geoms$area_m2)
+sum(broad_geoms$area_m2)
+
+
+st_write(papyrus_geoms, dsn = "../Output/Papyrus_classified.shp", append = F)
+st_write(broad_geoms, dsn = "../Output/Broad_Classified.shp", append = F)
+st_write(classified_geom_sf_sub, dsn = "../Output/Classified_Vector_Sieved.shp", append = F)
+
+
+
+# DO the same for Daveron's classification to compare areas
+dav <- rast("../PapyrusData/DaveronClassification/Generalised_FullImg_20m_4326_echocl/Generalised_FullImg_20m_4326_echocl.tif")
+dav_poly <- as.polygons(dav, dissolve = T)
+dav_geom <- st_as_sf(dav_poly)
+dav_geom$area_m2 <- st_area(dav_geom)
+sum(dav_geom[dav_geom$Band_1 == 2,]$area_m2)
+sum(dav_geom[dav_geom$Band_1 == 3,]$area_m2)

@@ -1,4 +1,4 @@
-setwd("D:/MyStuff/Masters2/Research Project/R Project")
+setwd("D:/MyStuff/Masters2/ResearchProject/R Project")
 
 library(tidyverse)
 library(sf)
@@ -8,14 +8,6 @@ library(dplyr)
 # read in all the shape files
 merged_shp <- st_read("../Combined Shape Files/Merged_All_Shapes.shp") %>% 
               st_transform(crs = 4326)
-
-# Cross reference the vegetation fields to get all the descriptions
-table(merged_shp$VegCode, merged_shp$Descriptio, useNA = "always")
-table(merged_shp$VegCode, merged_shp$VegNme, useNA = "always")
-table(merged_shp$Descriptio, merged_shp$VegNme, useNA = "always")
-
-merged_shp[!is.na(merged_shp$Descriptio) & !is.na(merged_shp$VegNme),]
-merged_shp[!is.na(merged_shp$Descriptio) & !is.na(merged_shp$VegNme) & !is.na(merged_shp$VegCode),]
 
 # Still don't know what veg codes 5 & 7 mean- only present in Bukiro-Kibale
 # 1 = Cut
@@ -60,9 +52,6 @@ merged_shp$Classifier[which(merged_shp$Descriptio %in% c("Mixed vegetation",
                                                          "Shrubs"))] <- "Broad Wetland"
 merged_shp$Classifier[which(merged_shp$Descriptio %in% c("Open water"))] <- "Open water"
 
-merged_shp$Descriptio[which(is.na(merged_shp$Classifier))]
-merged_shp$VegNme[which(is.na(merged_shp$Classifier))]
-
 # These remaining entries are duplicates of Bunyonyi 10 with no description
 # TODO: (Check I did this right and the other bunyonyi 9 are still present)
 merged_shp <- merged_shp[which(merged_shp$source != "C:\\Users\\DAVERO~1\\AppData\\Local\\Temp\\RtmpQD5IdZ\\merged_shapes_671448971c34/Bunyonyi Habitats/Bunyonyi 9/Bunyonyi 9.shp"),]
@@ -76,23 +65,23 @@ all_wetland <- rbind(output[which(output$Classifier %in% c("Papyrus", "Broad Wet
 other_wetland <- rbind(output[which(output$Classifier == "Broad Wetland"),])
 
 
-#### Read in Linda's existing geometries ####
+#### Read in updated versions of Lynda's geometries ####
 
-papyrus_input <- st_read("../PapyrusData/Combined/papyrus_combined_shp.shp")
-papyrus_output <- papyrus_input["geometry"] %>% 
+papyrus_input <- st_read("../PapyrusData/Updated_Habitats/papyrus_edited.shp")
+papyrus_input <- papyrus_input["geometry"] %>% 
                    st_transform(crs = 4326)
-papyrus_output$Classifier <- "Papyrus"
-papyrus_output$source <- "D:/MyStuff/Masters2/Research Project/PapyrusData/Combined/papyrus_combined_shp.shp" # TODO: switch this to get the path instead
 
-broad_input <- st_read("../PapyrusData/Combined/broad_combined_shp.shp")
-broad_input <- broad_input["geometry"] %>% 
-               st_transform(crs = 4326)
+other_input <- st_read("../PapyrusData/Updated_Habitats/other_wetland_edited.shp")
+other_input <- other_input["geometry"] %>% 
+               st_transform(crs = 4326) %>% 
+               st_make_valid()
 
-all_input <- st_read("../PapyrusData/Combined/all_wetland_combined_shp.shp")
-all_input <- all_input["geometry"] %>% 
-             st_transform(crs = 4326)
+agri_input <- st_read("../PapyrusData/Updated_Habitats/agricultural_wetland_edited.shp")
+agri_input <- agri_input["geometry"] %>% 
+              st_transform(crs = 4326) %>% 
+              st_make_valid()
 
-# Remove areas of overlap with newer Bunyonyi dataset- we will assume the latter is more accurate
+# We need to remove areas of overlap with newer Bunyonyi dataset- we will assume the latter is more accurate
 b_1 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 1/Bunyonyi 1.shp")
 b_2 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 2/Bunyonyi 2.shp")
 b_3 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 3/Bunyonyi 3.shp")
@@ -104,7 +93,9 @@ b_8 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 8/Bunyonyi 8.shp")
 b_9 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 9/Bunyonyi 9.shp")
 b_10 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 10/Bunyonyi 10.shp")
 
-# The Merged_All_shapes is missing Bunyonyi 1's papyrus - add it back
+# The Merged_All_shapes is missing Bunyonyi 1's papyrus because the original data had an issue
+# Work out the shape of the papyrus by taking the region described as "Bunyonyi 1" 
+# and subtracting all the other described regions from it
 bunyonyi_remainder <- subset(b_1, Descriptio != "Bunyonyi 1", select = c(geometry))
 bunyonyi_pap <- subset(b_1, Descriptio == "Bunyonyi 1", select = c(geometry)) %>% 
                 st_difference(st_union(st_combine(bunyonyi_remainder))) %>% 
@@ -115,47 +106,41 @@ bunyonyi_pap$Classifier <- "Papyrus"
 bunyonyi_pap$source <- "C:/Users/DAVERO~1/AppData/Local/Temp/RtmpQD5IdZ/merged_shapes_671448971c34/Bunyonyi Habitats/Bunyonyi 1/Bunyonyi 1.shp"
 papyrus <- rbind(papyrus, bunyonyi_pap)
 
+
+# Create a single 'new' Bunyonyi to mask from the older data
+# Remove areas covered by newer Bunyonyi data to avoid overlaps when merging later
 bunyonyi <- rbind(b_1, b_2, b_3, b_4, b_5, b_6, b_7, b_8, b_9, b_10) %>% 
             st_combine() %>% 
             st_union() %>% 
             st_make_valid() %>% 
             st_transform(crs = 4326)
 
-# Remove areas covered by newer Bunyonyi data to avoid overlaps when merging later
 sf_use_s2(FALSE)
-all_input <- st_difference(all_input, bunyonyi)
-broad_input <- st_difference(broad_input, bunyonyi)
-papyrus_input <- st_difference(papyrus_input, bunyonyi)
-
-
-# Create output version of 'broad' wetland, assuming this is papyrus + other wetland, to be merged
-# This is assuming we don't care what type of wetland, just that it's wetland
-combined_output <- broad_input
-combined_output$Classifier <- "All Wetland"
-combined_output$source <- "D:/MyStuff/Masters2/Research Project/PapyrusData/Combined/broad_combined_shp.shp"
-
-#### Intersect geometries
-agri_output <- st_difference(all_input, st_union(st_combine(broad_input)))
-broad_output <- st_difference(broad_input, st_union(st_combine(papyrus_input)))
-
+agri_output <- st_difference(agri_input, bunyonyi)
 agri_output$Classifier <- "Agricultural Wetland"
-agri_output$source <- "D:/MyStuff/Masters2/Research Project/PapyrusData/Combined/all_wetland_combined_shp.shp"
-broad_output$Classifier <- "Broad Wetland"
-broad_output$source <- "D:/MyStuff/Masters2/Research Project/PapyrusData/Combined/broad_combined_shp.shp"
+agri_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/agricultural_wetland_edited.shp"
+
+
+other_output <- st_difference(other_input, bunyonyi)
+other_output$Classifier <- "Broad Wetland"
+other_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/other_wetland_edited.shp"
+
+papyrus_output <- st_difference(papyrus_input, bunyonyi)
+papyrus_output$Classifier <- "Papyrus"
+papyrus_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/papyrus_edited.shp" # TODO: switch this to get the path instead
 
 # Merge new shapes with existing
-papyrus_merged <- rbind(papyrus_output, papyrus)
-broad_merged <- rbind(broad_output, other_wetland)
-combined_merged <- rbind(combined_output, all_wetland)
+papyrus_merged <- rbind(papyrus_output, papyrus) %>% 
+                  st_cast("MULTIPOLYGON")
+other_merged <- rbind(other_output, other_wetland) %>% 
+                  st_cast("MULTIPOLYGON")
+agri_output <- st_cast(agri_output, "MULTIPOLYGON")
 
 # Output to new files
 st_write(papyrus_merged, dsn = "../PapyrusData/Merged_VRC/Papyrus_merged.shp", append = F)
-st_write(broad_merged, dsn = "../PapyrusData/Merged_VRC/Other_wetland_merged.shp", append = F)
-st_write(combined_merged, dsn = "../PapyrusData/Merged_VRC/Both_wetland_merged.shp", append = F)
+st_write(other_merged, dsn = "../PapyrusData/Merged_VRC/Other_wetland_merged.shp", append = F)
 st_write(agri_output, dsn = "../PapyrusData/Merged_VRC/Agricultural_wetland.shp", append = F)
-# TODO: Investigate why this gives an error on "feature 121" when writing out agri_output- it appears to be a GEOMETRYCOLLECTION where the others are all multipolygons
 
 st_write(papyrus_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Papyrus', append = F)
-st_write(broad_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Other Wetland', append = F)
-st_write(combined_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Combined', append = F)
-st_write(agri_output, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Agricultural', append = F)
+st_write(other_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Other Wetland', append = F)
+st_write(agri_output, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Agricultural Wetland', append = F)
