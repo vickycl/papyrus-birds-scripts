@@ -1,4 +1,4 @@
-setwd("D:/MyStuff/Masters2/ResearchProject/R Project")
+setwd("D:/MyStuff/Masters2/ResearchProject/RunThrough_Full")
 
 library(tidyverse)
 library(sf)
@@ -9,6 +9,7 @@ library(terra)
 prepare_geom <- function(sf){
   # Dissolve polygons, project to UTM36N for buffering, negatively buffer
   new_geom <- st_transform(sf, crs = 32735) %>% 
+              st_make_valid() %>%
               st_union() %>% 
               st_make_valid() %>%
               st_buffer(-5) %>% 
@@ -37,19 +38,19 @@ prepare_geom <- function(sf){
 # 6 - Cloud 
 # 7 - Open water 
 # 8 - Urban 
-# 9 - Cloud Shadow 
+# 9 - Cloud Shadow
 
-agriwet <- st_read("../PapyrusData/Merged_VRC/Agricultural_wetland.shp")
-papyrus <- st_read("../PapyrusData/Merged_VRC/Papyrus_merged.shp")
-broad <- st_read("../PapyrusData/Merged_VRC/Other_wetland_merged.shp")
-
+agriwet <- st_read("Agricultural_wetland.shp")
 train_agriwet <- prepare_geom(agriwet)
-train_papyrus <- prepare_geom(papyrus)
-train_broad <- prepare_geom(broad)
+st_write(train_agriwet, "agri_wet_sieved.shp", append = F)
 
-# st_write(train_agriwet, dsn = "../PapyrusData/Merged_VRC/Agri_training.shp", append = F)
-# st_write(train_papyrus, dsn = "../PapyrusData/Merged_VRC/Papyrus_training.shp", append = F)
-# st_write(train_broad, dsn = "../PapyrusData/Merged_VRC/Broad_training.shp", append = F)
+papyrus <- st_read("Papyrus_merged.shp")
+train_papyrus <- prepare_geom(papyrus)
+st_write(train_papyrus, "papyrus_sieved.shp", append = F)
+
+other <- st_read("Other_wetland_merged.shp")
+train_broad <- prepare_geom(other)
+st_write(train_broad, "other_wetland_sieved.shp", append = F)
 
 # Step 2- Add classification values (as above)
 
@@ -61,7 +62,7 @@ train_broad$class <- 3
 # Add in other classifications from manual polygons
 train_agri <- st_read("../PapyrusData/CustomDataLayers/Agriculture.shp") %>% 
   subset(select = c('geometry'))
-train_forest <- st_read("../PapyrusData/CustomDataLayers/Forest_Scrub.shp")%>% 
+train_forest <- st_read("../PapyrusData/CustomDataLayers/Forest.shp")%>% 
   subset(select = c('geometry'))
 train_cloud <- st_read("../PapyrusData/CustomDataLayers/Clouds.shp")%>% 
   subset(select = c('geometry'))
@@ -81,9 +82,9 @@ train_shadow$class <- 9
 
 # Step 3 - merge all shapes into 1 dataset
 
-# TODO: Confirm this is the right sentinel to base the raster on given the cell size, CRS etc
+# Use one of the Sentinel rasters as the CRS and the template/ sample
 sentinel <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_B01_20m.jp2")
-# TODO: We need to knit a further west raster on to capture Lake Mutanda
+
 dataset <- rbind(train_agriwet, 
                  train_papyrus, 
                  train_broad,
@@ -95,7 +96,7 @@ dataset <- rbind(train_agriwet,
                  train_shadow) %>% 
   st_transform(crs = st_crs(sentinel))
 
-# Step 4 - rasterize dataset, use the existing sentinel image as sample
+# Step 4 - rasterize dataset, using the existing sentinel image as sample
 
 rast <- rasterize(vect(dataset), sentinel, field = "class")
 
@@ -103,78 +104,7 @@ rast <- rasterize(vect(dataset), sentinel, field = "class")
 
 writeRaster(
   rast,
-  "../PapyrusData/Merged_VRC/Training_Raster.tif",
+  "Training_Raster.tif",
   datatype = "INT1U",
   overwrite = TRUE
 )
-
-#### the R20m sentinel images are missing bands, fill them in from different resolutions
-sentinel_10m_B08 <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R10m/T35MRU_20250804T080631_B08_10m.jp2")
-
-sentinel_60m_B09 <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R60m/T35MRU_20250804T080631_B09_60m.jp2")
-
-sentinel_20m_B08 <- aggregate(sentinel_10m_B08, fact = 2, fun = mean)
-sentinel_20m_B09 <- disagg(sentinel_60m_B09, fact = 3, method = 'bilinear')
-
-writeRaster(
-  sentinel_20m_B08,
-  "../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_B08_20m_agg.tif",
-  overwrite = TRUE
-)
-writeRaster(
-  sentinel_20m_B09,
-  "../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_B09_20m_disagg.tif",
-  overwrite = TRUE
-)
-
-## INPUT ABOVE INTO MULTISPEC, GENERATE CLASSIFIED OUTPUT THERE
-#
-#
-#
-#
-#
-#
-# NOW READ BACK IN TO CLEAN UP OUTPUT
-
-# For comparison
-multispec_result <- rast("../PapyrusData/MultispecOutput/Multispec_output_20260609.tif")
-plot(multispec_result)
-crs(multispec_result) <- crs(sentinel)
-
-writeRaster(
-  multispec_result,
-  "../PapyrusData/Merged_VRC/Classified_Output_20260609.tif",
-  overwrite = TRUE
-)
-
-# Turn the resulting classified raster back into polygons 
-classified_geom <- as.polygons(multispec_result, dissolve = T)
-
-# Filter out some noise to make the data manageable
-classified_geom_sf <- st_as_sf(classified_geom)
-classified_geom_sf$area_m2 <- st_area(classified_geom_sf)
-
-min_area <- units::set_units(2000, "m^2")
-classified_geom_sf_sub <- subset(classified_geom_sf, ClassifiedOutput_1 %in% c(1,2,3) | area_m2 > min_area)
-
-
-papyrus_geoms <- subset(classified_geom_sf, ClassifiedOutput_1 == 2)
-broad_geoms <- subset(classified_geom_sf, ClassifiedOutput_1 == 3)
-
-sum(papyrus_geoms$area_m2)
-sum(broad_geoms$area_m2)
-
-
-st_write(papyrus_geoms, dsn = "../Output/Papyrus_classified.shp", append = F)
-st_write(broad_geoms, dsn = "../Output/Broad_Classified.shp", append = F)
-st_write(classified_geom_sf_sub, dsn = "../Output/Classified_Vector_Sieved.shp", append = F)
-
-
-
-# DO the same for Daveron's classification to compare areas
-dav <- rast("../PapyrusData/DaveronClassification/Generalised_FullImg_20m_4326_echocl/Generalised_FullImg_20m_4326_echocl.tif")
-dav_poly <- as.polygons(dav, dissolve = T)
-dav_geom <- st_as_sf(dav_poly)
-dav_geom$area_m2 <- st_area(dav_geom)
-sum(dav_geom[dav_geom$Band_1 == 2,]$area_m2)
-sum(dav_geom[dav_geom$Band_1 == 3,]$area_m2)

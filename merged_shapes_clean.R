@@ -1,4 +1,4 @@
-setwd("D:/MyStuff/Masters2/ResearchProject/R Project")
+setwd("D:/MyStuff/Masters2/ResearchProject/RunThrough_Full")
 
 library(tidyverse)
 library(sf)
@@ -102,7 +102,7 @@ bunyonyi_pap <- subset(b_1, Descriptio == "Bunyonyi 1", select = c(geometry)) %>
                 st_transform(crs = 4326)
 
 bunyonyi_pap$Classifier <- "Papyrus"
-# Fake this back to where it should have been
+# Fake this back to where it 'should' have been
 bunyonyi_pap$source <- "C:/Users/DAVERO~1/AppData/Local/Temp/RtmpQD5IdZ/merged_shapes_671448971c34/Bunyonyi Habitats/Bunyonyi 1/Bunyonyi 1.shp"
 papyrus <- rbind(papyrus, bunyonyi_pap)
 
@@ -112,22 +112,22 @@ papyrus <- rbind(papyrus, bunyonyi_pap)
 bunyonyi <- rbind(b_1, b_2, b_3, b_4, b_5, b_6, b_7, b_8, b_9, b_10) %>% 
             st_combine() %>% 
             st_union() %>% 
-            st_make_valid() %>% 
-            st_transform(crs = 4326)
+            st_transform(crs = 4326) %>% 
+            st_make_valid()
 
 sf_use_s2(FALSE)
 agri_output <- st_difference(agri_input, bunyonyi)
 agri_output$Classifier <- "Agricultural Wetland"
-agri_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/agricultural_wetland_edited.shp"
+agri_output$source <- "agricultural_wetland_edited.shp"
 
 
 other_output <- st_difference(other_input, bunyonyi)
 other_output$Classifier <- "Broad Wetland"
-other_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/other_wetland_edited.shp"
+other_output$source <- "other_wetland_edited.shp"
 
 papyrus_output <- st_difference(papyrus_input, bunyonyi)
 papyrus_output$Classifier <- "Papyrus"
-papyrus_output$source <- "D:/MyStuff/Masters2/ResearchProject/PapyrusData/Updated_Habitats/papyrus_edited.shp" # TODO: switch this to get the path instead
+papyrus_output$source <- "papyrus_edited.shp"
 
 # Merge new shapes with existing
 papyrus_merged <- rbind(papyrus_output, papyrus) %>% 
@@ -137,10 +137,6 @@ other_merged <- rbind(other_output, other_wetland) %>%
 agri_output <- st_cast(agri_output, "MULTIPOLYGON")
 
 # Output to new files
-st_write(papyrus_merged, dsn = "../PapyrusData/Merged_VRC/Papyrus_merged.shp", append = F)
-st_write(other_merged, dsn = "../PapyrusData/Merged_VRC/Other_wetland_merged.shp", append = F)
-st_write(agri_output, dsn = "../PapyrusData/Merged_VRC/Agricultural_wetland.shp", append = F)
-
-st_write(papyrus_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Papyrus', append = F)
-st_write(other_merged, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Other Wetland', append = F)
-st_write(agri_output, dsn = "../PapyrusData/Merged_VRC/All_wetlands.gpkg", layer = 'Agricultural Wetland', append = F)
+st_write(papyrus_merged, dsn = "Papyrus_merged.shp", append = F)
+st_write(other_merged, dsn = "Other_wetland_merged.shp", append = F)
+st_write(agri_output, dsn = "Agricultural_wetland.shp", append = F)

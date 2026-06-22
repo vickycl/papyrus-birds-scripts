@@ -5,6 +5,7 @@ library(sf)
 library(dplyr)
 library(terra)
 
+# Reminder:
 # 1 - Agricultural Wetland
 # 2 - Papyrus 
 # 3 - Broad Wetland 
@@ -16,19 +17,106 @@ library(terra)
 # 9 - Cloud Shadow 
 
 ## EVERYTHING OUTPUT BY MULTISPEC NEEDS A CRS RE-ASSIGNING
-
-# For comparison
 sentinel <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_AOT_20m.jp2")
-multispec_out <- rast("../PapyrusData/MultispecOutput/T35MRU_20250804T080631_B_output1.tif")
-
-multispec_result <- rast("../PapyrusData/MultispecOutput/Classified_Output1.tif")
+multispec_result <- rast("../RunThrough3/T35MRU_20250804T080631_B_echocl.tif")
 crs(multispec_result) <- crs(sentinel)
 
 writeRaster(
   multispec_result,
-  "../PapyrusData/MultispecOutput/Classified_Output2.tif",
+  "../RunThrough3/Classified_withCRS.tif",
   overwrite = TRUE
 )
+
+### Generalize pipeline ###
+
+# 1. 'Region Group', with number of nearest neighbours = 4, Zone grouping method 'Within', and 'Add link field to output' on
+
+regions <- patches(multispec_result, directions = 4, values = T)
+
+#?? in arcGIS there's a link field option that I'm not sure how to match
+
+# 2. 'Input false raster or constant value' of 1 piped into 'Set Null' where COUNT < 5, creating NibbleMask raster
+
+  
+# 3. 'Nibble' the NibbleMask from above, Using NoData values if they are the nearest neighbour, and nibbling NoData cells
+  
+# 4. 'Set Null' on all values not in c(2, 3)
+
+
+
+### From ChatGPT:
+r <- rast("../RunThrough3/Classified_withCRS.tif")
+
+#-----------------------------------------------------------
+# Region Group
+# ArcGIS: FOUR, WITHIN
+#-----------------------------------------------------------
+
+patches_r <- patches(
+  r,
+  directions = 4,
+  values = T
+)
+
+#-----------------------------------------------------------
+# Compute patch sizes
+#-----------------------------------------------------------
+
+f <- freq(patches_r)
+
+size_r <- classify(
+  patches_r,
+  cbind(f$value, f$count)
+)
+
+#-----------------------------------------------------------
+# Small patches (<5 cells)
+#-----------------------------------------------------------
+
+small_patch <- size_r < 5
+
+#-----------------------------------------------------------
+# Approximate Nibble
+#-----------------------------------------------------------
+
+modal_r <- focal(
+  r,
+  w = matrix(1,3,3),
+  fun = modal,
+  na.policy = "omit"
+)
+
+generalised <- ifel(
+  small_patch,
+  modal_r,
+  r
+)
+
+#-----------------------------------------------------------
+# Keep only classes 2 and 3
+#-----------------------------------------------------------
+
+output <- ifel(
+  generalised %in% c(2,3),
+  generalised,
+  NA
+)
+
+writeRaster(
+  output,
+  "../RunThrough3/Generalised_by_chat.tif",
+  overwrite = TRUE
+)
+
+### end chat gpt ###
+
+# Compare chat gpt's with the ArcGIS one:
+freq(output)
+arc <- rast("../RunThrough3/Generalised_output.tif")
+freq(arc)
+
+
+#### The following polygonisation makes everything very slow
 
 # Turn the resulting classified raster back into polygons 
 classified_geom <- as.polygons(multispec_result, dissolve = T)
@@ -59,18 +147,4 @@ dav_geom$area_m2 <- st_area(dav_geom)
 sum(dav_geom[dav_geom$Band_1 == 2,]$area_m2)
 sum(dav_geom[dav_geom$Band_1 == 3,]$area_m2)
 
-# Copy of ArcGIS Generalise Pipeline:
-
-# 1. 'Region Group', with number of nearest neighbours = 4, Zone grouping method 'Within', and 'Add link field to output' on
-
-regions <- patches(multispec_result, directions = 4, values = T)
-#?? in arcGIS there's a link field option that I'm not sure how to match
-
-# 2. 'Input false raster or constant value' of 1 piped into 'Set Null' where COUNT < 5, creating NibbleMask raster
-
-????
-
-# 3. 'Nibble' the NibbleMask from above, Using NoData values if they are the nearest neighbour, and nibbling NoData cells
-
-# 4. 'Set Null' on all values not in c(2, 3)
 
