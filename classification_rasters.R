@@ -5,9 +5,17 @@ library(sf)
 library(dplyr)
 library(terra)
 
+#===============
+# Paths etc
+
+CUSTOM_LAYER_PATH <- "custom_data_layers"
+SENTINEL_PATH <- "../Sentinel/S2B_MSIL2A_20250730T080609_N0511_R078_T35MRU_20250730T103041.SAFE/GRANULE/L2A_T35MRU_A043862_20250730T082708/IMG_DATA/R20m/T35MRU_20250730T080609_B01_20m.jp2"
+
+#===============
+
 #### Workflow to produce classification rasters ####
 prepare_geom <- function(sf){
-  # Dissolve polygons, project to UTM36N for buffering, negatively buffer
+  # Dissolve polygons, project to UTM 35S for buffering, negatively buffer
   new_geom <- st_transform(sf, crs = 32735) %>% 
               st_make_valid() %>%
               st_union() %>% 
@@ -60,17 +68,17 @@ train_papyrus$class <- 2
 train_broad$class <- 3
 
 # Add in other classifications from manual polygons
-train_agri <- st_read("../PapyrusData/CustomDataLayers/Agriculture.shp") %>% 
+train_agri <- st_read(sprintf("%s/Agriculture.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
-train_forest <- st_read("../PapyrusData/CustomDataLayers/Forest.shp")%>% 
+train_forest <- st_read(sprintf("%s/Forest.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
-train_cloud <- st_read("../PapyrusData/CustomDataLayers/Clouds.shp")%>% 
+train_cloud <- st_read(sprintf("%s/Cloud.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
-train_water <- st_read("../PapyrusData/CustomDataLayers/OpenWater.shp")%>% 
+train_water <- st_read(sprintf("%s/OpenWater.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
-train_urban <- st_read("../PapyrusData/CustomDataLayers/Urban.shp")%>% 
+train_urban <- st_read(sprintf("%s/Urban.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
-train_shadow <- st_read("../PapyrusData/CustomDataLayers/Cloud Shadow.shp")%>% 
+train_shadow <- st_read(sprintf("%s/CloudShadow.shp", CUSTOM_LAYER_PATH)) %>% 
   subset(select = c('geometry'))
 
 train_agri$class <- 4
@@ -83,7 +91,7 @@ train_shadow$class <- 9
 # Step 3 - merge all shapes into 1 dataset
 
 # Use one of the Sentinel rasters as the CRS and the template/ sample
-sentinel <- rast("../PapyrusData/Sentinel_2025-08-04/S2C_MSIL2A_20250804T080631_N0511_R078_T35MRU_20250804T133415.SAFE/GRANULE/L2A_T35MRU_A004767_20250804T082807/IMG_DATA/R20m/T35MRU_20250804T080631_B01_20m.jp2")
+sentinel <- rast(SENTINEL_PATH)
 
 dataset <- rbind(train_agriwet, 
                  train_papyrus, 

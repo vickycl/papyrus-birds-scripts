@@ -4,9 +4,19 @@ library(tidyverse)
 library(sf)
 library(dplyr)
 
+#===================
+# Paths and other config
+
+MERGED_SHAPES_PATH <- "Merged_All_Shapes/Merged_All_Shapes.shp"
+BUNYONYI_PATH <- "Bunyonyi Habitats"
+LYNDA_DATA_PATH <- "edited_lynda_data"
+
+
+#===================
+
 #### MERGED FILE CLEANING ####
 # read in all the shape files
-merged_shp <- st_read("../Combined Shape Files/Merged_All_Shapes.shp") %>% 
+merged_shp <- st_read(MERGED_SHAPES_PATH) %>% 
               st_transform(crs = 4326)
 
 # Still don't know what veg codes 5 & 7 mean- only present in Bukiro-Kibale
@@ -67,31 +77,31 @@ other_wetland <- rbind(output[which(output$Classifier == "Broad Wetland"),])
 
 #### Read in updated versions of Lynda's geometries ####
 
-papyrus_input <- st_read("../PapyrusData/Updated_Habitats/papyrus_edited.shp")
+papyrus_input <- st_read(sprintf("%s/papyrus_edited.shp", LYNDA_DATA_PATH))
 papyrus_input <- papyrus_input["geometry"] %>% 
                    st_transform(crs = 4326)
 
-other_input <- st_read("../PapyrusData/Updated_Habitats/other_wetland_edited.shp")
+other_input <- st_read(sprintf("%s/other_wetland_edited.shp", LYNDA_DATA_PATH))
 other_input <- other_input["geometry"] %>% 
                st_transform(crs = 4326) %>% 
                st_make_valid()
 
-agri_input <- st_read("../PapyrusData/Updated_Habitats/agricultural_wetland_edited.shp")
+agri_input <- st_read(sprintf("%s/agricultural_wetland_edited.shp", LYNDA_DATA_PATH))
 agri_input <- agri_input["geometry"] %>% 
               st_transform(crs = 4326) %>% 
               st_make_valid()
 
 # We need to remove areas of overlap with newer Bunyonyi dataset- we will assume the latter is more accurate
-b_1 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 1/Bunyonyi 1.shp")
-b_2 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 2/Bunyonyi 2.shp")
-b_3 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 3/Bunyonyi 3.shp")
-b_4 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 4/Bunyonyi 4.shp")
-b_5 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 5/Bunyonyi 5.shp")
-b_6 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 6/Bunyonyi 6.shp")
-b_7 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 7/Bunyonyi 7.shp")
-b_8 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 8/Bunyonyi 8.shp")
-b_9 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 9/Bunyonyi 9.shp")
-b_10 <- st_read("../PapyrusData/Bunyonyi Habitats/Bunyonyi 10/Bunyonyi 10.shp")
+b_1 <- st_read(sprintf("%s/Bunyonyi 1/Bunyonyi 1.shp", BUNYONYI_PATH))
+b_2 <- st_read(sprintf("%s/Bunyonyi 2/Bunyonyi 2.shp", BUNYONYI_PATH))
+b_3 <- st_read(sprintf("%s/Bunyonyi 3/Bunyonyi 3.shp", BUNYONYI_PATH))
+b_4 <- st_read(sprintf("%s/Bunyonyi 4/Bunyonyi 4.shp", BUNYONYI_PATH))
+b_5 <- st_read(sprintf("%s/Bunyonyi 5/Bunyonyi 5.shp", BUNYONYI_PATH))
+b_6 <- st_read(sprintf("%s/Bunyonyi 6/Bunyonyi 6.shp", BUNYONYI_PATH))
+b_7 <- st_read(sprintf("%s/Bunyonyi 7/Bunyonyi 7.shp", BUNYONYI_PATH))
+b_8 <- st_read(sprintf("%s/Bunyonyi 8/Bunyonyi 8.shp", BUNYONYI_PATH))
+b_9 <- st_read(sprintf("%s/Bunyonyi 9/Bunyonyi 9.shp", BUNYONYI_PATH))
+b_10 <- st_read(sprintf("%s/Bunyonyi 10/Bunyonyi 10.shp", BUNYONYI_PATH))
 
 # The Merged_All_shapes is missing Bunyonyi 1's papyrus because the original data had an issue
 # Work out the shape of the papyrus by taking the region described as "Bunyonyi 1" 

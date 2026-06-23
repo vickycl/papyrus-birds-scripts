@@ -23,11 +23,11 @@ library(tidyverse)
 # -----------------------------------------------------------------------------
 # CONFIG — edit these
 # -----------------------------------------------------------------------------
-IMAGE_PATH  <- "T35MRU_20250804T080631_B.tif" # Multi-band Sentinel-2 GeoTIFF
+IMAGE_PATH  <- "Sentinel.tif" # Multi-band Sentinel-2 GeoTIFF
 LABELS_PATH <- "Training_Raster.tif"   # Aligned single-band label raster
-TWI_PATH    <- "twi_resample.tif"      # Topographic Wetness Index as a predictor
-FOCAL_PATH  <- "3x3_focal_mean.tif"    # Neighbourhood smoothing as a predictor
-ADDITIONAL_FOCAL_PATH  <- "5x5_focal_mean.tif"
+#TWI_PATH    <- "twi_resample.tif"      # Topographic Wetness Index as a predictor
+FOCAL_PATH  <- "Sentinel_3x3.tif"    # Neighbourhood smoothing as a predictor
+ADDITIONAL_FOCAL_PATH  <- "Sentinel_5x5.tif"
 
 #   (integer class codes; 0 = no data)
 OUTPUT_PATH <- "classified.tif"        # Where to write the result
@@ -42,7 +42,7 @@ TEST_SPLIT  <- 0.2                     # Fraction held out for validation
 start.time <- Sys.time()
 
 cat("[1/5] Loading rasters...\n")
-image  <- c(rast(IMAGE_PATH), rast(FOCAL_PATH), rast(ADDITIONAL_FOCAL_PATH), rast(TWI_PATH))
+image  <- c(rast(IMAGE_PATH), rast(FOCAL_PATH), rast(ADDITIONAL_FOCAL_PATH))#, rast(TWI_PATH))
 
 labels <- rast(LABELS_PATH)
 
